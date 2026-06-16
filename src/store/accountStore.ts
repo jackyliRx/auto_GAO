@@ -131,12 +131,7 @@ async function refreshAccountState(acc: Account, forceAll = false) {
         acc.party = pStatus;
       }
     }
-    if (forceAll || !acc.automation.battle.timeline) {
-      const pTimeline = await acc.userObj.getTimeline();
-      if (pTimeline) {
-        acc.automation.battle.timeline = pTimeline;
-      }
-    }
+    // timeline 只在戰鬥/趕路後由 battle()/run() 回傳並更新，不在閒置輪詢中抓取
   } catch (error) {
     console.error("refreshAccountState error:", error);
   }

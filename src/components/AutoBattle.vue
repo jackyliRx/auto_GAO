@@ -398,11 +398,15 @@ const equipmentCheckTag = ref(true);
 
 const items = ref({ items: [], equipments: [] });
 
+// 防止 store→local 和 local→store 互相觸發的防護 flag
+const isUpdatingFromStore = ref(false);
+
 // 當更換帳號或後台狀態更新時，同步寫入本地綁定變數
 watch(
   currentBattleAutomation,
   (newVal) => {
     if (newVal) {
+      isUpdatingFromStore.value = true;
       setting.value.hp = newVal.setting.hp;
       setting.value.sp = newVal.setting.sp;
       setting.value.map = newVal.setting.map;
@@ -427,12 +431,16 @@ watch(
       weaponCheckTag.value = newVal.weaponCheckTag;
       armorCheckTag.value = newVal.armorCheckTag;
       equipmentCheckTag.value = newVal.equipmentCheckTag;
+      // 用 nextTick 延遲釋放 flag，確保本次寫入完成後才允許反向同步
+      setTimeout(() => {
+        isUpdatingFromStore.value = false;
+      }, 0);
     }
   },
   { immediate: true, deep: true }
 );
 
-// 當 UI 修改設定時，自動同步回 Store 的帳號物件（這也會自動寫入 LocalStorage）
+// 當 UI 修改設定時，自動同步回 Store 的帳號物件（也會自動寫入 LocalStorage）
 watch(
   [
     setting,
@@ -443,6 +451,8 @@ watch(
     equipmentCheckTag,
   ],
   () => {
+    // 如果是 store 主動寫入本地則跳過，避免觸發鬼角更新
+    if (isUpdatingFromStore.value) return;
     if (account.value) {
       const battleAuto = account.value.automation.battle;
       battleAuto.setting.hp = setting.value.hp;
