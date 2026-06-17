@@ -104,8 +104,15 @@ class autoBattleChecker {
     const hpMode = this.setting.hpRecoveryMode || "rest";
     const spMode = this.setting.spRecoveryMode || "rest";
 
-    // 1. 檢查 HP
-    if (this.profile.hp <= this.setting.hp) {
+    console.log(
+      `[HP/SP 檢查] ${this.profile.name} - 當前 HP: ${this.profile.hp}/${this.profile.fullHp} (設定門檻: ${this.setting.hp}), SP: ${this.profile.sp}/${this.profile.fullSp} (設定門檻: ${this.setting.sp})`
+    );
+
+    // 1. 檢查 HP (如果已經 100% 滿則不觸發休息，避免設定大於上限造成的無限休息死循環)
+    if (
+      this.profile.hp < this.profile.fullHp &&
+      this.profile.hp <= this.setting.hp
+    ) {
       if (hpMode === "medicine") {
         ElMessage("HP 低於設定，嘗試吃藥...");
         const eatSuccess = await this.eatMedicine(
@@ -126,8 +133,11 @@ class autoBattleChecker {
       }
     }
 
-    // 2. 檢查 SP
-    if (this.profile.sp <= this.setting.sp) {
+    // 2. 檢查 SP (如果已經 100% 滿則不觸發休息，避免設定大於上限造成的無限休息死循環)
+    if (
+      this.profile.sp < this.profile.fullSp &&
+      this.profile.sp <= this.setting.sp
+    ) {
       if (spMode === "medicine") {
         ElMessage("SP 低於設定，嘗試吃藥...");
         const eatSuccess = await this.eatMedicine(

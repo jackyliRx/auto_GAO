@@ -11,20 +11,29 @@ class statusCheck {
   }
 
   checkStatus = async () => {
+    const offset = this.profile.serverOffsetMs || 0;
+    const adjustedNow = () => moment().add(offset, "ms");
+
     switch (this.profile.actionStatus) {
       case "休息": {
         if (this.setting?.autoRest) {
           let targetSeconds = Number(this.setting.autoRestSeconds || 0);
           if (targetSeconds <= 0) {
-            // 用 restStartedAt 的時間戳當 Seed，為當前休息階段產生一個固定且隨機的 20~40 秒目標
             const seed = moment(this.profile.actionStart).valueOf();
             targetSeconds = 20 + (seed % 21);
           }
 
-          if (this.actionTimeSeconds() >= targetSeconds) {
+          const elapsedSec = this.actionTimeSeconds();
+          console.log(
+            `[狀態檢查-自動休息] ${this.profile.name} 已進行 ${Math.floor(
+              elapsedSec
+            )} 秒 / 目標 ${targetSeconds} 秒`
+          );
+
+          if (elapsedSec >= targetSeconds) {
             ElMessage(
               `已休息 ${Math.floor(
-                this.actionTimeSeconds()
+                elapsedSec
               )} 秒 (目標 ${targetSeconds} 秒)，停止休息並檢查狀態...`
             );
             let profile = await this.user.restComplete();
@@ -36,6 +45,11 @@ class statusCheck {
             const hpPercent = (this.profile.hp / this.profile.fullHp) * 100;
             const mpPercent = (this.profile.sp / this.profile.fullSp) * 100;
             const targetPercent = Number(this.setting.autoRestPercent ?? 90);
+            console.log(
+              `[狀態檢查-自動休息評估] ${this.profile.name} HP: ${Math.round(
+                hpPercent
+              )}%, SP: ${Math.round(mpPercent)}% | 目標門檻: ${targetPercent}%`
+            );
 
             if (hpPercent >= targetPercent && mpPercent >= targetPercent) {
               ElMessage(
@@ -56,14 +70,19 @@ class statusCheck {
           }
           ElMessage(
             `休息中，已進行 ${Math.floor(
-              this.actionTimeSeconds()
+              elapsedSec
             )} 秒 / 目標 ${targetSeconds} 秒`
           );
           return false;
         }
 
         const reqDuration = this.setting?.restDuration ?? 10;
-        if (this.actionTime() >= reqDuration) {
+        const elapsedMin = this.actionTime();
+        console.log(
+          `[狀態檢查-普通休息] ${this.profile.name} 已進行 ${elapsedMin} 分 / 目標 ${reqDuration} 分`
+        );
+
+        if (elapsedMin >= reqDuration) {
           let profile = await this.user.restComplete();
           if (profile) {
             this.profile = profile;
@@ -82,8 +101,20 @@ class statusCheck {
         return false;
       }
 
-      case "移動":
-        if (moment().isAfter(moment(this.profile.actionStart))) {
+      case "移動": {
+        const arrivalTime = moment(this.profile.actionStart);
+        const remainingMs = arrivalTime.diff(adjustedNow());
+        // 只要剩餘時間小於 15 秒，就判定已抵達並嘗試落地 (容忍 15 秒時鐘偏差)
+        const isArrived = remainingMs <= 15000;
+        console.log(
+          `[狀態檢查-移動] ${
+            this.profile.name
+          } 目標抵達時間: ${arrivalTime.toISOString()} | 當前伺服器對齊時間: ${adjustedNow().toISOString()} | 剩餘時間: ${Math.ceil(
+            remainingMs / 1000
+          )} 秒 | 是否嘗試落地: ${isArrived}`
+        );
+
+        if (isArrived) {
           let profile = await this.user.moveComplete();
           if (profile && !profile.error) {
             this.profile = profile;
@@ -96,16 +127,20 @@ class statusCheck {
           }
         }
         {
-          let remaining = moment.duration(
-            moment(this.profile.actionStart).diff(moment())
-          );
+          let remaining = moment.duration(remainingMs);
           ElMessage(
             `移動中！剩餘時間：${remaining.minutes()} 分 ${remaining.seconds()} 秒`
           );
           return false;
         }
+      }
 
       case "重生":
+        console.log(
+          `[狀態檢查-重生] ${
+            this.profile.name
+          } 重生已耗時: ${this.actionTime()} 分`
+        );
         if (this.actionTime() >= 10) {
           this.setProfileInfo(await this.user.restComplete());
           ElMessage("復活！");
@@ -115,6 +150,11 @@ class statusCheck {
         return false;
 
       case "鍛造":
+        console.log(
+          `[狀態檢查-鍛造] ${
+            this.profile.name
+          } 鍛造剩餘時間: ${this.forgeTime()} 秒`
+        );
         if (this.forgeTime() < -5) {
           this.setProfileInfo(await this.user.forgeComplete());
           ElMessage("鍛造完成");
@@ -136,12 +176,20 @@ class statusCheck {
   };
 
   actionTime = () => {
-    let diff = moment.duration(moment().diff(moment(this.profile.actionStart)));
+    const offset = this.profile.serverOffsetMs || 0;
+    const clientTime = moment().add(offset, "ms");
+    let diff = moment.duration(
+      clientTime.diff(moment(this.profile.actionStart))
+    );
     return diff.minutes();
   };
 
   actionTimeSeconds = () => {
-    let diff = moment.duration(moment().diff(moment(this.profile.actionStart)));
+    const offset = this.profile.serverOffsetMs || 0;
+    const clientTime = moment().add(offset, "ms");
+    let diff = moment.duration(
+      clientTime.diff(moment(this.profile.actionStart))
+    );
     return diff.asSeconds();
   };
 
@@ -153,10 +201,12 @@ class statusCheck {
   };
 
   forgeTime = () => {
+    const offset = this.profile.serverOffsetMs || 0;
+    const clientTime = moment().add(offset, "ms");
     let diff = moment.duration(
-      moment(this.profile.forgingCompletionTime).diff(moment())
+      moment(this.profile.forgingCompletionTime).diff(clientTime)
     );
-    return diff.seconds();
+    return diff.asSeconds();
   };
 }
 

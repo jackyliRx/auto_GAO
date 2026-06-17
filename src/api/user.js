@@ -1,6 +1,7 @@
 import axios from "axios";
 
 const baseurl = "https://gunart-backend.onrender.com/api";
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 function user(inputToken) {
   this.token = inputToken;
@@ -146,6 +147,10 @@ function user(inputToken) {
         headers: getHeaders(),
       });
       const charData = authMeRes.data?.character;
+      const serverTimeStr = authMeRes.headers?.date;
+      const serverOffsetMs = serverTimeStr
+        ? new Date(serverTimeStr).getTime() - Date.now()
+        : 0;
 
       const towerRes = await axios.get(`${baseurl}/tower/status`, {
         headers: getHeaders(),
@@ -171,7 +176,16 @@ function user(inputToken) {
         console.error("fetch mine status error:", e);
       }
 
-      return normalizeProfile(charData, towerRes.data, activeJob, mineStatus);
+      const profile = normalizeProfile(
+        charData,
+        towerRes.data,
+        activeJob,
+        mineStatus
+      );
+      if (profile) {
+        profile.serverOffsetMs = serverOffsetMs;
+      }
+      return profile;
     } catch (error) {
       console.error("getProfile error:", error);
       return false;
@@ -235,11 +249,29 @@ function user(inputToken) {
   this.run = async function () {
     try {
       await axios.get(`${baseurl}/party/status`, { headers: getHeaders() });
-      const chooseRes = await axios.post(
-        `${baseurl}/tower/choose`,
-        { option: "run" },
-        { headers: getHeaders() }
-      );
+      let chooseRes;
+      try {
+        chooseRes = await axios.post(
+          `${baseurl}/tower/choose`,
+          { option: "run" },
+          { headers: getHeaders() }
+        );
+      } catch (error) {
+        if (error.response?.status === 409) {
+          console.warn(
+            "[趕路衝突 409] 偵測到移動衝突，嘗試先確認落地 (moveComplete)..."
+          );
+          await this.moveComplete();
+          await sleep(500);
+          chooseRes = await axios.post(
+            `${baseurl}/tower/choose`,
+            { option: "run" },
+            { headers: getHeaders() }
+          );
+        } else {
+          throw error;
+        }
+      }
       const timelineRes = await axios.get(`${baseurl}/tower/timeline`, {
         headers: getHeaders(),
       });
@@ -279,11 +311,29 @@ function user(inputToken) {
   this.battle = async function () {
     try {
       await axios.get(`${baseurl}/party/status`, { headers: getHeaders() });
-      const chooseRes = await axios.post(
-        `${baseurl}/tower/choose`,
-        { option: "fight" },
-        { headers: getHeaders() }
-      );
+      let chooseRes;
+      try {
+        chooseRes = await axios.post(
+          `${baseurl}/tower/choose`,
+          { option: "fight" },
+          { headers: getHeaders() }
+        );
+      } catch (error) {
+        if (error.response?.status === 409) {
+          console.warn(
+            "[戰鬥衝突 409] 偵測到移動衝突，嘗試先確認落地 (moveComplete)..."
+          );
+          await this.moveComplete();
+          await sleep(500);
+          chooseRes = await axios.post(
+            `${baseurl}/tower/choose`,
+            { option: "fight" },
+            { headers: getHeaders() }
+          );
+        } else {
+          throw error;
+        }
+      }
       const timelineRes = await axios.get(`${baseurl}/tower/timeline`, {
         headers: getHeaders(),
       });
