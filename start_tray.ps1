@@ -1,9 +1,9 @@
 Add-Type -AssemblyName System.Windows.Forms, System.Drawing
 
-# 1. Start npx serve in background (using -y to auto-install and setting working directory)
+# 1. Start npx serve in background and redirect output to start_tray.log for debugging
 $psi = New-Object System.Diagnostics.ProcessStartInfo
 $psi.FileName = "cmd.exe"
-$psi.Arguments = "/c npx -y serve -s dist -l 8080"
+$psi.Arguments = "/c npx -y serve -s dist -l 8080 > start_tray.log 2>&1"
 $psi.WorkingDirectory = $PSScriptRoot
 $psi.WindowStyle = [System.Diagnostics.ProcessWindowStyle]::Hidden
 $psi.CreateNoWindow = $true
