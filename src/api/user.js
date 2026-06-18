@@ -278,6 +278,24 @@ function user(inputToken) {
     }
   };
 
+  this.enterSecretRealm = async function () {
+    try {
+      const res = await axios.post(
+        `${baseurl}/tower/secret-realm/enter`,
+        {},
+        { headers: getHeaders() }
+      );
+      return res.data;
+    } catch (error) {
+      console.log("enterSecretRealm error:", error);
+      return {
+        error: true,
+        status: error.response?.status,
+        message: error.message,
+      };
+    }
+  };
+
   this.run = async function (enableTimeline = true) {
     try {
       console.log("[API] 發送趕路巡檢，先獲取組隊狀態...");
@@ -618,17 +636,28 @@ function user(inputToken) {
 
   this.forge = async function (payload) {
     try {
+      console.log("[API] 發起鍛造，payload:", JSON.stringify(payload));
       const res = await axios.post(`${baseurl}/forge/craft`, payload, {
         headers: getHeaders(),
       });
+      console.log("[API] 鍛造結果狀態:", res.status, res.data);
       if (res.status == 200) {
         return this.getProfile();
       } else {
-        return false;
+        return { error: true, message: `伺服器回應狀態碼：${res.status}` };
       }
     } catch (error) {
-      console.log(error);
-      return false;
+      console.error("[API] 鍛造拋出異常:", error);
+      const errMsg =
+        error.response?.data?.message ||
+        error.response?.data ||
+        error.message ||
+        "未知異常";
+      return {
+        error: true,
+        message: typeof errMsg === "object" ? JSON.stringify(errMsg) : errMsg,
+        status: error.response?.status,
+      };
     }
   };
 

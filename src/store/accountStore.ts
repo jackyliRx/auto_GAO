@@ -28,6 +28,7 @@ export interface Account {
       loopId?: number;
       logs: LogItem[];
       timeline: any;
+      lastTimelineCheckKey?: string;
       setting: {
         hp: number;
         sp: number;
@@ -46,6 +47,7 @@ export interface Account {
         enableLogs?: boolean;
         enableTimeline?: boolean;
         refreshMode?: string;
+        enterSecretRealmEnabled?: boolean;
         partyMode?: {
           enabled: boolean;
           isLeader: boolean;
@@ -78,7 +80,7 @@ export interface Account {
       weaponPayload: {
         weapon_name: string;
         result_item_id: number;
-        materials: Array<{ item_id: number; quantity: number }>;
+        materials: Array<{ item_id: number; quantity: number; name?: string }>;
       };
       setting: {
         loopCraft: boolean;
@@ -110,6 +112,7 @@ export interface Account {
 
 const accounts = reactive<Account[]>([]);
 const selectedAccountIndex = ref<number>(-1);
+const knownItemNames = reactive<Record<number, string>>({});
 
 // 從 localStorage 載入
 const savedTokens = JSON.parse(localStorage.getItem("strList") || "[]");
@@ -158,11 +161,36 @@ async function refreshAccountState(acc: Account, forceAll = false) {
         acc.tower = profile.towerStatus;
       }
     }
+    // 離開地圖自動解除秘境鎖定
+    if (acc.profile && acc.profile.inSecretRealm === true) {
+      const currentMap = acc.profile.zoneName;
+      if (
+        currentMap !== "大草原" &&
+        currentMap !== "great_plains" &&
+        currentMap !== "猛牛園" &&
+        currentMap !== "bull_pen" &&
+        currentMap !== "蘑菇園" &&
+        currentMap !== "mushroom_garden"
+      ) {
+        acc.profile.inSecretRealm = false;
+        addLog(
+          acc,
+          "battle",
+          "[秘境] 偵測到已離開秘境地圖，自動重設秘境鎖定狀態。"
+        );
+      }
+    }
     // 同步抓取背包與裝備清單
     const itemsRes = await acc.userObj.item();
     if (itemsRes) {
       acc.items.equipments = itemsRes.equipments || [];
       acc.items.items = itemsRes.items || [];
+      acc.items.items.forEach((item: any) => {
+        const itemId = item.item_id || item.id;
+        if (itemId && item.name) {
+          knownItemNames[itemId] = item.name;
+        }
+      });
     }
     if (forceAll || !acc.party) {
       const pStatus = await acc.userObj.getPartyStatus();
@@ -185,7 +213,16 @@ function addAccount(token: string) {
   const savedSettingRaw = localStorage.getItem(`setting_${token}`);
   let savedSetting: any = {};
   try {
-    if (savedSettingRaw) savedSetting = JSON.parse(savedSettingRaw);
+    if (savedSettingRaw) {
+      savedSetting = JSON.parse(savedSettingRaw);
+      if (savedSetting.forgeWeaponPayload?.materials) {
+        savedSetting.forgeWeaponPayload.materials.forEach((m: any) => {
+          if (m.item_id && m.name) {
+            knownItemNames[m.item_id] = m.name;
+          }
+        });
+      }
+    }
   } catch (e) {
     console.error("載入帳號設定失敗", e);
   }
@@ -231,6 +268,8 @@ function addAccount(token: string) {
           enableLogs: savedSetting.setting?.enableLogs ?? true,
           enableTimeline: savedSetting.setting?.enableTimeline ?? true,
           refreshMode: savedSetting.setting?.refreshMode ?? "auto",
+          enterSecretRealmEnabled:
+            savedSetting.setting?.enterSecretRealmEnabled ?? false,
           partyMode: {
             enabled: savedSetting.setting?.partyMode?.enabled ?? false,
             isLeader: savedSetting.setting?.partyMode?.isLeader ?? false,
@@ -298,7 +337,6 @@ function addAccount(token: string) {
   // 初始化讀取個人資料與 Token 身份驗證
   userObj.getAuthMe().then((authData: any) => {
     if (authData) {
-      console.log("Token 驗證成功 (auth/me):", authData);
       if (authData.character) {
         const char = authData.character;
         account.profile.nickname = char.name;
@@ -544,6 +582,48 @@ async function startBattle(token: string) {
         if (checkResult) {
           const pMode = acc.automation.battle.setting.partyMode;
           if (pMode && pMode.enabled && !pMode.isLeader) {
+            // 隊員端：秘境自動進入偵測
+            const secretRealmConfig: Record<string, number> = {
+              大草原: 16,
+              great_plains: 16,
+              猛牛園: 18,
+              bull_pen: 18,
+              蘑菇園: 12,
+              mushroom_garden: 12,
+            };
+            const currentMap = acc.profile.zoneName;
+            const targetFloor = secretRealmConfig[currentMap];
+            if (
+              targetFloor &&
+              acc.profile.huntStage === targetFloor &&
+              acc.automation.battle.setting.enterSecretRealmEnabled
+            ) {
+              if (acc.profile.inSecretRealm !== true) {
+                addLog(
+                  acc,
+                  "battle",
+                  `[秘境] 隊員抵達 ${targetFloor}F，自動發送進入秘境請求...`
+                );
+                try {
+                  const enterRes = await acc.userObj.enterSecretRealm();
+                  if (enterRes && !enterRes.error) {
+                    acc.profile.inSecretRealm = true;
+                    addLog(acc, "battle", `[秘境] 隊員進入秘境成功！`);
+                  } else {
+                    addLog(
+                      acc,
+                      "battle",
+                      `[秘境] 隊員進入秘境失敗: ${
+                        enterRes?.message || "未知錯誤"
+                      }`
+                    );
+                  }
+                } catch (e) {
+                  console.error(`[隊員進入秘境] 失敗:`, e);
+                }
+              }
+            }
+
             addLog(
               acc,
               "battle",
@@ -554,17 +634,190 @@ async function startBattle(token: string) {
             const refreshMode =
               acc.automation.battle.setting.refreshMode ?? "auto";
             if (enableTimeline && refreshMode === "auto") {
-              try {
-                const timelineRes = await acc.userObj.getTimeline();
-                if (timelineRes) {
-                  acc.automation.battle.timeline = timelineRes;
+              // eslint-disable-next-line prettier/prettier
+              const currentCheckKey = `${acc.profile.exp || 0}_${acc.profile.hp}_${acc.profile.sp}_${acc.profile.huntStage || 0}_${acc.profile.zoneName || ''}`;
+              // eslint-disable-next-line prettier/prettier
+              if (acc.automation.battle.lastTimelineCheckKey !== currentCheckKey) {
+                try {
+                  const timelineRes = await acc.userObj.getTimeline();
+                  if (timelineRes) {
+                    acc.automation.battle.timeline = timelineRes;
+                  }
+                  acc.automation.battle.lastTimelineCheckKey = currentCheckKey;
+                } catch (e) {
+                  console.error(`[隊員 Timeline 刷新] 失敗:`, e);
                 }
-              } catch (e) {
-                console.error(`[隊員 Timeline 刷新] 失敗:`, e);
               }
             }
           } else {
             let proceedWithBattle = true;
+
+            // 秘境偵測與組隊協調邏輯
+            const secretRealmConfig: Record<string, number> = {
+              大草原: 16,
+              great_plains: 16,
+              猛牛園: 18,
+              bull_pen: 18,
+              蘑菇園: 12,
+              mushroom_garden: 12,
+            };
+            const currentMap = acc.profile.zoneName;
+            const targetFloor = secretRealmConfig[currentMap];
+
+            if (
+              targetFloor &&
+              acc.profile.huntStage === targetFloor &&
+              acc.automation.battle.setting.enterSecretRealmEnabled
+            ) {
+              const isParty = pMode && pMode.enabled;
+
+              if (!isParty) {
+                // A. 個人模式：直接自動進入秘境
+                if (acc.profile.inSecretRealm !== true) {
+                  addLog(
+                    acc,
+                    "battle",
+                    `[秘境] 抵達 ${targetFloor}F 秘境層，自動發送進入秘境請求...`
+                  );
+                  const enterRes = await acc.userObj.enterSecretRealm();
+                  if (enterRes && !enterRes.error) {
+                    acc.profile.inSecretRealm = true;
+                    addLog(acc, "battle", `[秘境] 成功進入秘境！`);
+                    proceedWithBattle = false; // 本輪先不進行戰鬥，等下輪
+                  } else {
+                    addLog(
+                      acc,
+                      "battle",
+                      `[秘境] 進入秘境失敗: ${
+                        enterRes?.message || "未知錯誤"
+                      }，將於下輪重試...`
+                    );
+                    proceedWithBattle = false;
+                  }
+                }
+              } else if (pMode.isLeader) {
+                // B. 隊長模式：殿後進入秘境邏輯
+                // 1. 取得隊伍狀態
+                const partyStatus = await acc.userObj.getPartyStatus();
+                if (
+                  partyStatus &&
+                  partyStatus.party &&
+                  partyStatus.party.members
+                ) {
+                  const members = partyStatus.party.members;
+                  let allManagedMembersInSecretRealm = true;
+                  const waitingMemberNames: string[] = [];
+
+                  for (const member of members) {
+                    // 排除隊長自己
+                    if (
+                      (acc.profile.id &&
+                        Number(member.user_id) === Number(acc.profile.id)) ||
+                      (acc.profile.userId &&
+                        Number(member.user_id) ===
+                          Number(acc.profile.userId)) ||
+                      (acc.profile.user_id &&
+                        Number(member.user_id) === Number(acc.profile.user_id))
+                    ) {
+                      continue;
+                    }
+
+                    // 尋找我方託管的隊友
+                    const memberAcc = accounts.find(
+                      (a) =>
+                        (a.profile.id &&
+                          Number(a.profile.id) === Number(member.user_id)) ||
+                        (a.profile.userId &&
+                          Number(a.profile.userId) ===
+                            Number(member.user_id)) ||
+                        (a.profile.user_id &&
+                          Number(a.profile.user_id) === Number(member.user_id))
+                    );
+
+                    if (memberAcc) {
+                      // 只有當該隊友也正處於秘境層時，隊長才需要等他進入秘境；若他在其他樓層，直接忽略不卡 16F
+                      if (memberAcc.profile.huntStage === targetFloor) {
+                        if (memberAcc.profile.inSecretRealm !== true) {
+                          allManagedMembersInSecretRealm = false;
+                          waitingMemberNames.push(member.character_name);
+                        }
+                      }
+                    }
+                  }
+
+                  if (!allManagedMembersInSecretRealm) {
+                    // 還有同在秘境層的託管隊友沒進去，隊長原地等待
+                    addLog(
+                      acc,
+                      "battle",
+                      `[秘境等待] 隊長在 ${targetFloor}F 等待同在該層的我方隊友進入秘境: ${waitingMemberNames.join(
+                        ", "
+                      )}...`
+                    );
+                    proceedWithBattle = false;
+                  } else {
+                    // 我方託管隊友皆已進入秘境，隊長自己進入秘境
+                    if (acc.profile.inSecretRealm !== true) {
+                      addLog(
+                        acc,
+                        "battle",
+                        `[秘境] 託管隊友已全數進入，隊長殿後進入秘境！`
+                      );
+                      const enterRes = await acc.userObj.enterSecretRealm();
+                      if (enterRes && !enterRes.error) {
+                        acc.profile.inSecretRealm = true;
+                        addLog(acc, "battle", `[秘境] 隊長成功進入秘境！`);
+                        proceedWithBattle = false; // 本輪進完先不戰鬥
+                      } else {
+                        addLog(
+                          acc,
+                          "battle",
+                          `[秘境] 隊長進入秘境失敗: ${
+                            enterRes?.message || "未知錯誤"
+                          }，下輪重試...`
+                        );
+                        proceedWithBattle = false;
+                      }
+                    } else {
+                      // 隊長自己也已經進了秘境
+                      // 此時如果隊伍有外人（非我方託管且有啟用 hasExternalMembers），且外人處於秘境層，隊長在此階段需要等待外人就緒
+                      if (pMode.hasExternalMembers) {
+                        let externalInRealmWaiting = false;
+                        for (const member of members) {
+                          // 排除我方託管帳號
+                          const isManaged = accounts.some(
+                            (a) =>
+                              (a.profile.id &&
+                                Number(a.profile.id) ===
+                                  Number(member.user_id)) ||
+                              (a.profile.userId &&
+                                Number(a.profile.userId) ===
+                                  Number(member.user_id)) ||
+                              (a.profile.user_id &&
+                                Number(a.profile.user_id) ===
+                                  Number(member.user_id))
+                          );
+                          if (!isManaged) {
+                            // 只要該外人也處於秘境層 (floor === 16)，隊長就需要等待外人就緒
+                            if (member.floor === targetFloor) {
+                              externalInRealmWaiting = true;
+                              addLog(
+                                acc,
+                                "battle",
+                                `[秘境等待] 隊外成員 ${member.character_name} 仍處於 ${targetFloor}F，等待其就緒...`
+                              );
+                            }
+                          }
+                        }
+                        if (externalInRealmWaiting) {
+                          proceedWithBattle = false;
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
 
             if (pMode && pMode.enabled) {
               if (pMode.isLeader) {
@@ -1195,13 +1448,24 @@ async function startForge(token: string) {
               const hold = backpackItems.find(
                 (m: any) => m.item_id === req.item_id || m.id === req.item_id
               );
+              if (hold && hold.name) {
+                knownItemNames[req.item_id] = hold.name;
+              }
+              if (req.name) {
+                knownItemNames[req.item_id] = req.name;
+              }
               if (!hold || hold.quantity < req.quantity) {
+                const materialName =
+                  hold?.name ||
+                  req.name ||
+                  knownItemNames[req.item_id] ||
+                  `物品ID(${req.item_id})`;
                 addLog(
                   acc,
                   "forge",
-                  `材料不足：需要 ${hold?.name || `物品ID(${req.item_id})`} x${
-                    req.quantity
-                  }，持有 x${hold?.quantity || 0}`
+                  `材料不足：需要 ${materialName} x${req.quantity}，持有 x${
+                    hold?.quantity || 0
+                  }`
                 );
                 hasEnough = false;
                 break;
@@ -1227,12 +1491,17 @@ async function startForge(token: string) {
               materials: payload.materials,
               weapon_name: payload.weapon_name,
             });
-            if (forgeResult) {
+            if (forgeResult && !forgeResult.error) {
               safeUpdateProfile(acc, forgeResult);
               isCrafting = true;
               addLog(acc, "forge", `鍛造請求已送出，目前進入「鍛造」狀態。`);
             } else {
-              addLog(acc, "forge", "發起鍛造失敗！將於下個週期重試。");
+              const reason = forgeResult?.message || "未知錯誤";
+              addLog(
+                acc,
+                "forge",
+                `發起鍛造失敗！原因: ${reason}。將於下個週期重試。`
+              );
             }
           }
         } else {
@@ -1443,6 +1712,7 @@ export const useAccountStore = () => ({
   accounts,
   selectedAccountIndex,
   selectedAccount,
+  knownItemNames,
   addAccount,
   removeAccount,
   selectAccount,

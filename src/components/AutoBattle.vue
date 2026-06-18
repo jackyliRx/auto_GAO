@@ -2,7 +2,11 @@
   <div class="auto-battle-module">
     <el-card shadow="never" class="inner-card">
       <el-row :gutter="20" align="middle">
-        <el-col :span="8">
+        <el-col
+          :xs="24"
+          :sm="8"
+          style="margin-bottom: 10px; sm-margin-bottom: 0"
+        >
           <el-select
             v-model="setting.map"
             placeholder="選擇目標地圖"
@@ -17,13 +21,14 @@
             />
           </el-select>
         </el-col>
-        <el-col :span="16" class="button-group">
+        <el-col :xs="24" :sm="16" class="button-group">
           <el-button
             type="success"
             size="large"
             :icon="VideoPlay"
             @click="handleAutoBattle"
             :disabled="scriptStatus"
+            style="flex: 1"
             >啟動自動戰鬥</el-button
           >
           <el-button
@@ -32,6 +37,7 @@
             :icon="VideoPause"
             @click="handleStop"
             :disabled="!scriptStatus"
+            style="flex: 1"
             >停止</el-button
           >
         </el-col>
@@ -53,19 +59,21 @@
       </el-row>
 
       <el-row :gutter="20" style="margin-top: 15px" align="middle">
-        <el-col :span="12">
+        <el-col :xs="16" :sm="10">
           <div class="input-label">日誌更新</div>
           <el-radio-group
             v-model="setting.refreshMode"
             size="default"
             class="full-width-radio-group"
           >
-            <el-radio-button label="auto">自動刷新</el-radio-button>
-            <el-radio-button label="manual">手動刷新</el-radio-button>
+            <el-radio-button label="auto">自動</el-radio-button>
+            <el-radio-button label="manual">手動</el-radio-button>
           </el-radio-group>
         </el-col>
-        <el-col :span="4">
-          <div class="input-label" style="visibility: hidden">手動刷新</div>
+        <el-col :xs="8" :sm="6">
+          <div class="input-label" style="opacity: 0; pointer-events: none">
+            刷新
+          </div>
           <el-button
             type="primary"
             plain
@@ -74,18 +82,20 @@
             :loading="manualRefreshing"
             style="width: 100%"
           >
-            立即刷新
+            刷新
           </el-button>
         </el-col>
         <el-col
-          :span="8"
+          :xs="24"
+          :sm="8"
           style="
             display: flex;
             flex-direction: column;
             gap: 8px;
             justify-content: flex-end;
-            padding-top: 20px;
+            padding-top: 15px;
           "
+          class="battle-log-checkboxes"
         >
           <el-checkbox
             v-model="setting.enableLogs"
@@ -105,7 +115,7 @@
       <el-divider border-style="dashed" />
 
       <el-row :gutter="20">
-        <el-col :span="12">
+        <el-col :xs="24" :sm="12">
           <el-descriptions title="執行資訊" :column="1" border>
             <el-descriptions-item label="狀態">
               <el-tag :type="scriptStatus ? 'success' : 'info'">{{
@@ -157,7 +167,7 @@
             </el-descriptions-item>
           </el-descriptions>
         </el-col>
-        <el-col :span="12">
+        <el-col :xs="24" :sm="12" class="protection-settings-col">
           <el-descriptions title="自動保護設定" :column="1" border>
             <el-descriptions-item label="HP 極限 (保護)">
               <div style="display: flex; gap: 8px; align-items: center">
@@ -190,6 +200,9 @@
 
             <el-descriptions-item label="允許空手">
               <el-switch v-model="setting.allowEmptyHanded" />
+            </el-descriptions-item>
+            <el-descriptions-item label="自動進入秘境">
+              <el-switch v-model="setting.enterSecretRealmEnabled" />
             </el-descriptions-item>
             <el-descriptions-item label="自動休息模式">
               <div style="display: flex; flex-direction: column; gap: 8px">
@@ -237,7 +250,12 @@
       </el-row>
 
       <el-row :gutter="20" style="margin-top: 20px">
-        <el-col :span="8" v-if="!setting.partyMode.enabled">
+        <el-col
+          :xs="24"
+          :sm="8"
+          v-if="!setting.partyMode.enabled"
+          style="margin-bottom: 10px; sm-margin-bottom: 0"
+        >
           <div class="input-label">層數上限 (0為無上限)</div>
           <el-input-number
             v-model="setting.mapLevel"
@@ -246,7 +264,12 @@
             placeholder="0為無上限"
           />
         </el-col>
-        <el-col :span="8" v-if="!setting.partyMode.enabled">
+        <el-col
+          :xs="24"
+          :sm="8"
+          v-if="!setting.partyMode.enabled"
+          style="margin-bottom: 10px; sm-margin-bottom: 0"
+        >
           <div class="input-label">趕路層數</div>
           <el-input-number
             v-model="setting.runLevel"
@@ -254,7 +277,7 @@
             style="width: 100%"
           />
         </el-col>
-        <el-col :span="!setting.partyMode.enabled ? 8 : 24">
+        <el-col :xs="24" :sm="!setting.partyMode.enabled ? 8 : 24">
           <div class="input-label">最低耐久</div>
           <el-input-number
             v-model="setting.weaponDuration"
@@ -276,7 +299,11 @@
         </div>
       </template>
       <el-row :gutter="20" v-if="setting.partyMode.enabled">
-        <el-col :span="6">
+        <el-col
+          :xs="12"
+          :sm="6"
+          style="margin-bottom: 10px; sm-margin-bottom: 0"
+        >
           <div class="input-label">我的身分</div>
           <el-switch
             v-model="setting.partyMode.isLeader"
@@ -286,7 +313,11 @@
           />
         </el-col>
         <template v-if="setting.partyMode.isLeader">
-          <el-col :span="6">
+          <el-col
+            :xs="12"
+            :sm="6"
+            style="margin-bottom: 10px; sm-margin-bottom: 0"
+          >
             <div class="input-label">隊伍層數上限 (0為無上限)</div>
             <el-input-number
               v-model="setting.partyMode.maxFloor"
@@ -305,7 +336,11 @@
               ※ 抵達該層直接回村。
             </div>
           </el-col>
-          <el-col :span="6">
+          <el-col
+            :xs="12"
+            :sm="6"
+            style="margin-bottom: 10px; sm-margin-bottom: 0"
+          >
             <div class="input-label">隊伍趕路層數</div>
             <el-input-number
               v-model="setting.partyMode.runLevel"
@@ -323,7 +358,11 @@
               ※ 低於該層趕路，否則戰鬥。
             </div>
           </el-col>
-          <el-col :span="6">
+          <el-col
+            :xs="12"
+            :sm="6"
+            style="margin-bottom: 10px; sm-margin-bottom: 0"
+          >
             <div class="input-label">組員最低耐久</div>
             <el-input-number
               v-model="setting.partyMode.minDurability"
@@ -409,7 +448,11 @@
         </div>
       </template>
       <el-row :gutter="20">
-        <el-col :span="12">
+        <el-col
+          :xs="24"
+          :sm="12"
+          style="margin-bottom: 10px; sm-margin-bottom: 0"
+        >
           <div class="input-label">HP 補品</div>
           <el-select
             v-model="medicineSetting.medicineHpId"
@@ -424,7 +467,7 @@
             />
           </el-select>
         </el-col>
-        <el-col :span="12">
+        <el-col :xs="24" :sm="12">
           <div class="input-label">每次使用數量</div>
           <el-input-number
             v-model="medicineSetting.medicineHpQuantity"
@@ -816,6 +859,7 @@ const toggleBattleInfo = () => {
 const handleClearTimeline = () => {
   if (account.value) {
     account.value.automation.battle.timeline = null;
+    account.value.automation.battle.lastTimelineCheckKey = "";
   }
 };
 

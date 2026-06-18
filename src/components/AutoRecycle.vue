@@ -29,11 +29,14 @@
       <div class="table-container">
         <el-table
           :data="selectedWeapon"
+          ref="multipleTableRef"
           border
           style="width: 100%"
           size="small"
           class="dark-table"
+          @selection-change="handleSelectionChange"
         >
+          <el-table-column type="selection" width="55" align="center" />
           <el-table-column prop="name" label="名稱" min-width="120" />
           <el-table-column
             prop="durability"
@@ -57,8 +60,9 @@
       <div style="text-align: center; padding: 20px 0">
         <span class="recycle-confirm-text"
           >確定要回收這
-          <b style="color: #f56c6c">{{ selectedWeapon.length }}</b>
+          <b style="color: #f56c6c">{{ checkedWeapons.length }}</b>
           個裝備嗎？</span
+        >
         >
         <div style="margin-top: 10px; font-size: 12px; color: #909399">
           此操作不可逆，將會獲得材料。
@@ -94,7 +98,7 @@
 
 <script setup lang="ts">
 import { ElMessage } from "element-plus";
-import { ref, defineProps, onMounted } from "vue";
+import { ref, defineProps, onMounted, nextTick } from "vue";
 import sleep from "../common/sleep";
 
 const props = defineProps({
@@ -104,15 +108,20 @@ const props = defineProps({
 const durability = ref(10);
 const weapon = ref([]);
 const selectedWeapon = ref([]);
+const checkedWeapons = ref([]);
+const multipleTableRef = ref(null);
 const dialogVisible = ref(false);
 const recyclingActive = ref(false);
 const recycleProgress = ref(0);
 const emergencyButton = ref(false);
 
+const handleSelectionChange = (val: any[]) => {
+  checkedWeapons.value = val;
+};
+
 const confirmRecycle = () => {
-  filteredWeapons();
-  if (selectedWeapon.value.length === 0) {
-    ElMessage.warning("沒有符合條件的裝備");
+  if (checkedWeapons.value.length === 0) {
+    ElMessage.warning("請先勾選欲回收的裝備");
     return;
   }
   dialogVisible.value = true;
@@ -123,8 +132,8 @@ const handleRecycle = async () => {
   recyclingActive.value = true;
   emergencyButton.value = false;
 
-  let total = selectedWeapon.value.length;
-  let recycleAry = [...selectedWeapon.value];
+  let total = checkedWeapons.value.length;
+  let recycleAry = [...checkedWeapons.value];
 
   for (let i = 0; i < recycleAry.length; i++) {
     if (emergencyButton.value) break;
@@ -145,6 +154,12 @@ const handleRecycle = async () => {
   recyclingActive.value = false;
   recycleProgress.value = 0;
   ElMessage.success("批量回收完成！");
+
+  if (multipleTableRef.value) {
+    multipleTableRef.value.clearSelection();
+  }
+  checkedWeapons.value = [];
+
   await getItem();
 };
 
@@ -164,6 +179,14 @@ const filteredWeapons = () => {
   selectedWeapon.value = weapon.value.filter(
     (item) => item.durability <= durability.value
   );
+  nextTick(() => {
+    if (multipleTableRef.value) {
+      multipleTableRef.value.clearSelection();
+      selectedWeapon.value.forEach((row) => {
+        multipleTableRef.value.toggleRowSelection(row, true);
+      });
+    }
+  });
 };
 
 onMounted(async () => {

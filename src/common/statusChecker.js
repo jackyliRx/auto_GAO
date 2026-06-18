@@ -1,4 +1,7 @@
-import { ElMessage } from "element-plus";
+const ElMessage = (msg) => console.log("[自動化訊息]", msg);
+ElMessage.success = (msg) => console.log("[自動化成功]", msg);
+ElMessage.warning = (msg) => console.warn("[自動化警告]", msg);
+ElMessage.error = (msg) => console.error("[自動化錯誤]", msg);
 import moment from "moment";
 
 class statusCheck {

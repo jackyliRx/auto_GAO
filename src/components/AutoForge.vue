@@ -3,7 +3,11 @@
     <el-card shadow="never" class="inner-card">
       <!-- Controls -->
       <el-row :gutter="20" align="middle">
-        <el-col :span="12">
+        <el-col
+          :xs="24"
+          :sm="12"
+          style="margin-bottom: 10px; sm-margin-bottom: 0"
+        >
           <el-button
             type="success"
             size="large"
@@ -14,7 +18,7 @@
             啟動自動鍛造
           </el-button>
         </el-col>
-        <el-col :span="12">
+        <el-col :xs="24" :sm="12">
           <el-button
             type="danger"
             size="large"
@@ -33,10 +37,10 @@
             type="warning"
             size="large"
             @click="handleManualClaim"
-            :disabled="!isForging || scriptStatus"
+            :disabled="!canClaimForge || scriptStatus"
             style="width: 100%"
           >
-            手動領取裝備
+            手動領取裝備{{ claimCountdownText }}
           </el-button>
         </el-col>
       </el-row>
@@ -45,7 +49,11 @@
 
       <!-- Form Settings -->
       <el-row :gutter="20">
-        <el-col :span="12">
+        <el-col
+          :xs="24"
+          :sm="12"
+          style="margin-bottom: 10px; sm-margin-bottom: 0"
+        >
           <div class="input-label">選擇鍛造配方</div>
           <el-select
             v-model="result_item_id"
@@ -62,7 +70,7 @@
             />
           </el-select>
         </el-col>
-        <el-col :span="12">
+        <el-col :xs="24" :sm="12">
           <div class="input-label">自定義名稱 (不可為空)</div>
           <el-input
             v-model="weapon_name"
@@ -97,7 +105,11 @@
 
       <!-- Forge Favorites Configuration -->
       <el-row :gutter="20" align="middle" style="margin-top: 15px">
-        <el-col :span="10">
+        <el-col
+          :xs="24"
+          :sm="10"
+          style="margin-bottom: 10px; sm-margin-bottom: 0"
+        >
           <div class="input-label">載入收藏組合</div>
           <el-select
             v-model="activeFavoriteId"
@@ -120,21 +132,26 @@
             </el-option-group>
           </el-select>
         </el-col>
-        <el-col :span="14" style="margin-top: 20px">
-          <el-button-group>
-            <el-button type="primary" @click="handleSaveFavorite"
+        <el-col :xs="24" :sm="14" style="margin-top: 10px; sm-margin-top: 20px">
+          <el-button-group style="display: flex; width: 100%">
+            <el-button
+              type="primary"
+              @click="handleSaveFavorite"
+              style="flex: 1.5; padding: 0"
               >儲存組合</el-button
             >
             <el-button
               type="success"
               :disabled="!activeFavoriteId"
               @click="handleUpdateFavorite"
+              style="flex: 1; padding: 0"
               >更新</el-button
             >
             <el-button
               type="danger"
               :disabled="!activeFavoriteId"
               @click="handleDeleteFavorite"
+              style="flex: 1; padding: 0"
               >刪除</el-button
             >
           </el-button-group>
@@ -144,11 +161,11 @@
       <!-- Loop configuration -->
       <el-divider border-style="dashed" style="margin: 15px 0" />
       <el-row :gutter="20" align="middle">
-        <el-col :span="6">
+        <el-col :xs="8" :sm="6">
           <div class="input-label">循環製作</div>
           <el-switch v-model="loopCraft" />
         </el-col>
-        <el-col :span="9">
+        <el-col :xs="16" :sm="9">
           <div class="input-label">最大製作次數 (0 為無限制)</div>
           <el-input-number
             v-model="maxCraftCount"
@@ -158,7 +175,12 @@
             :disabled="!loopCraft"
           />
         </el-col>
-        <el-col :span="9" style="text-align: right">
+        <el-col
+          :xs="24"
+          :sm="9"
+          class="craft-count-col"
+          style="text-align: right"
+        >
           <div class="count-display">
             當前已累計:
             <span class="count-number">{{ currentCraftCount }}</span> 次
@@ -202,7 +224,7 @@
             >
           </div>
           <div
-            v-if="backpackMaterials.length > 0"
+            v-if="displayMaterialsList.length > 0"
             style="margin-top: 10px; margin-bottom: 10px"
           >
             <el-input
@@ -213,7 +235,7 @@
               style="width: 100%"
             />
           </div>
-          <div v-if="backpackMaterials.length === 0" class="empty-materials">
+          <div v-if="displayMaterialsList.length === 0" class="empty-materials">
             背包中無可用素材，請先前往採礦或取得材料。
           </div>
           <div
@@ -227,7 +249,13 @@
               v-for="item in filteredMaterials"
               :key="item.item_id"
               class="material-card"
-              :class="{ 'has-selected': selectedMaterials[item.item_id] > 0 }"
+              :class="{
+                'has-selected':
+                  selectedMaterials[item.item_id] > 0 &&
+                  selectedMaterials[item.item_id] <= item.quantity,
+                'insufficient-selected':
+                  selectedMaterials[item.item_id] > item.quantity,
+              }"
             >
               <div class="material-header">
                 <span class="material-name">{{ item.name }}</span>
@@ -296,9 +324,18 @@
 </template>
 
 <script setup lang="ts">
-import { ref, defineProps, defineEmits, onMounted, watch, computed } from "vue";
+import {
+  ref,
+  defineProps,
+  defineEmits,
+  onMounted,
+  onUnmounted,
+  watch,
+  computed,
+} from "vue";
 import { ElMessage } from "element-plus";
 import { useAccountStore } from "../store/accountStore";
+import moment from "moment";
 
 const props = defineProps({
   userObj: Object,
@@ -330,12 +367,65 @@ const backpackMaterials = ref<any[]>([]);
 const loadingRecipes = ref(false);
 const searchMaterialQuery = ref("");
 
+const displayMaterialsList = computed(() => {
+  const list = [...backpackMaterials.value];
+
+  // 取得目前選中收藏組合的所有材料 ID
+  const favoriteItemIds = new Set<number>();
+  if (activeFavoriteId.value) {
+    const fav = favorites.value.find((f) => f.id === activeFavoriteId.value);
+    if (fav && fav.materials) {
+      fav.materials.forEach((m) => {
+        favoriteItemIds.add(m.item_id);
+      });
+    }
+  }
+
+  // 1. 結合已選取數量 > 0 的項目
+  for (const [idStr, qty] of Object.entries(selectedMaterials.value)) {
+    const itemId = Number(idStr);
+    const qtyVal = Number(qty);
+    if (qtyVal > 0) {
+      const exists = list.some((m) => m.item_id === itemId);
+      if (!exists) {
+        list.push({
+          item_id: itemId,
+          name: store.knownItemNames[itemId] || `物品ID(${itemId})`,
+          quantity: 0,
+          bonus_atk: 0,
+          bonus_def: 0,
+          bonus_luck: 0,
+          bonus_durability: 0,
+        });
+      }
+    }
+  }
+
+  // 2. 結合當前收藏組合中定義的項目，即使它們已選數量為 0
+  favoriteItemIds.forEach((itemId) => {
+    const exists = list.some((m) => m.item_id === itemId);
+    if (!exists) {
+      list.push({
+        item_id: itemId,
+        name: store.knownItemNames[itemId] || `物品ID(${itemId})`,
+        quantity: 0,
+        bonus_atk: 0,
+        bonus_def: 0,
+        bonus_luck: 0,
+        bonus_durability: 0,
+      });
+    }
+  });
+
+  return list;
+});
+
 const filteredMaterials = computed(() => {
   if (!searchMaterialQuery.value.trim()) {
-    return backpackMaterials.value;
+    return displayMaterialsList.value;
   }
   const query = searchMaterialQuery.value.trim().toLowerCase();
-  return backpackMaterials.value.filter((item) =>
+  return displayMaterialsList.value.filter((item) =>
     (item.name || "").toLowerCase().includes(query)
   );
 });
@@ -355,7 +445,7 @@ interface ForgeFavorite {
   favoriteName: string;
   weapon_name: string;
   result_item_id: number;
-  materials: Array<{ item_id: number; quantity: number }>;
+  materials: Array<{ item_id: number; quantity: number; name?: string }>;
 }
 
 const activeFavoriteId = ref<string>("");
@@ -423,7 +513,18 @@ const loadFavorites = () => {
   const stored = localStorage.getItem(`forge_favorites_${props.userObj.token}`);
   if (stored) {
     try {
-      favorites.value = JSON.parse(stored);
+      const parsed = JSON.parse(stored);
+      favorites.value = parsed;
+      // 記錄收藏中的材料名稱
+      parsed.forEach((fav: any) => {
+        if (fav.materials) {
+          fav.materials.forEach((m: any) => {
+            if (m.item_id && m.name) {
+              store.knownItemNames[m.item_id] = m.name;
+            }
+          });
+        }
+      });
     } catch (e) {
       console.error("載入收藏組合失敗:", e);
       favorites.value = [];
@@ -486,6 +587,9 @@ watch(
       if (newVal.weaponPayload.materials) {
         newVal.weaponPayload.materials.forEach((m: any) => {
           newMats[m.item_id] = m.quantity;
+          if (m.name) {
+            store.knownItemNames[m.item_id] = m.name;
+          }
         });
       }
       // 確保將 backpackMaterials 中的項目也補上預設的 0
@@ -509,6 +613,9 @@ watch(
   backpackMaterials,
   (newMaterials) => {
     newMaterials.forEach((item) => {
+      if (item.name) {
+        store.knownItemNames[item.item_id] = item.name;
+      }
       if (selectedMaterials.value[item.item_id] === undefined) {
         selectedMaterials.value[item.item_id] = 0;
       }
@@ -526,13 +633,19 @@ watch(
       forge.weaponPayload.weapon_name = weapon_name.value;
       forge.weaponPayload.result_item_id = result_item_id.value;
 
-      const mats: Array<{ item_id: number; quantity: number }> = [];
+      const mats: Array<{ item_id: number; quantity: number; name?: string }> =
+        [];
       for (const [idStr, qty] of Object.entries(selectedMaterials.value)) {
         const qtyNum = Number(qty);
         if (qtyNum > 0) {
+          const itemId = Number(idStr);
+          const itemInfo = backpackMaterials.value.find(
+            (m) => m.item_id === itemId
+          );
           mats.push({
-            item_id: Number(idStr),
+            item_id: itemId,
             quantity: qtyNum,
+            name: itemInfo?.name || store.knownItemNames[itemId],
           });
         }
       }
@@ -563,16 +676,16 @@ const requiredQuantity = computed(() => {
 const totalSelectedQuantity = computed(() => {
   let sum = 0;
   for (const qty of Object.values(selectedMaterials.value)) {
-    sum += qty || 0;
+    sum += Number(qty) || 0;
   }
   return sum;
 });
 
 const isFormValid = computed(() => {
   return (
-    result_item_id.value > 0 &&
+    Number(result_item_id.value) > 0 &&
     weapon_name.value.trim() !== "" &&
-    totalSelectedQuantity.value === requiredQuantity.value
+    Number(totalSelectedQuantity.value) === Number(requiredQuantity.value)
   );
 });
 
@@ -625,6 +738,73 @@ const handleStop = () => {
 
 const isForging = computed(() => {
   return props.profile?.activeStatuses?.includes("鍛造") || false;
+});
+
+const nowTick = ref(Date.now());
+let countdownInterval: ReturnType<typeof setInterval> | null = null;
+
+const startTimer = () => {
+  if (countdownInterval) return;
+  nowTick.value = Date.now();
+  countdownInterval = setInterval(() => {
+    nowTick.value = Date.now();
+  }, 1000);
+};
+
+const stopTimer = () => {
+  if (countdownInterval) {
+    clearInterval(countdownInterval);
+    countdownInterval = null;
+  }
+};
+
+// 只有在真正鍛造中才啟動計時器，避免其他人物或閒置時佔用 CPU
+watch(
+  isForging,
+  (val) => {
+    if (val) {
+      startTimer();
+    } else {
+      stopTimer();
+    }
+  },
+  { immediate: true }
+);
+
+onUnmounted(() => {
+  stopTimer();
+});
+
+// 計算鍛造剩餘時間 (秒)
+const forgeRemainingSeconds = computed(() => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const _tick = nowTick.value;
+  if (!props.profile?.forgingCompletionTime) return 9999;
+  const offset = props.profile.serverOffsetMs || 0;
+  const clientTime = moment().add(offset, "ms");
+  const diff = moment.duration(
+    moment(props.profile.forgingCompletionTime).diff(clientTime)
+  );
+  return diff.asSeconds();
+});
+
+// 是否可以手動領取
+const canClaimForge = computed(() => {
+  return isForging.value && forgeRemainingSeconds.value <= -5;
+});
+
+// 按鈕倒數文字
+const claimCountdownText = computed(() => {
+  if (!isForging.value) return "";
+  const secs = forgeRemainingSeconds.value;
+  if (secs <= -5) return " (可領取)";
+  if (secs <= 0) return " (即將完成)";
+
+  const m = Math.floor(secs / 60);
+  const s = Math.floor(secs % 60);
+  return ` (剩餘 ${m.toString().padStart(2, "0")}:${s
+    .toString()
+    .padStart(2, "0")})`;
 });
 
 const handleManualClaim = async () => {
@@ -690,13 +870,18 @@ const handleSaveFavorite = () => {
     return;
   }
 
-  const mats: Array<{ item_id: number; quantity: number }> = [];
+  const mats: Array<{ item_id: number; quantity: number; name?: string }> = [];
   for (const [idStr, qty] of Object.entries(selectedMaterials.value)) {
     const qtyNum = Number(qty);
     if (qtyNum > 0) {
+      const itemId = Number(idStr);
+      const itemInfo = backpackMaterials.value.find(
+        (m) => m.item_id === itemId
+      );
       mats.push({
-        item_id: Number(idStr),
+        item_id: itemId,
         quantity: qtyNum,
+        name: itemInfo?.name || store.knownItemNames[itemId],
       });
     }
   }
@@ -722,13 +907,18 @@ const handleUpdateFavorite = () => {
   );
   if (favIndex === -1) return;
 
-  const mats: Array<{ item_id: number; quantity: number }> = [];
+  const mats: Array<{ item_id: number; quantity: number; name?: string }> = [];
   for (const [idStr, qty] of Object.entries(selectedMaterials.value)) {
     const qtyNum = Number(qty);
     if (qtyNum > 0) {
+      const itemId = Number(idStr);
+      const itemInfo = backpackMaterials.value.find(
+        (m) => m.item_id === itemId
+      );
       mats.push({
-        item_id: Number(idStr),
+        item_id: itemId,
         quantity: qtyNum,
+        name: itemInfo?.name || store.knownItemNames[itemId],
       });
     }
   }
@@ -865,6 +1055,11 @@ onMounted(async () => {
   background-color: #152318;
 }
 
+.material-card.insufficient-selected {
+  border-color: #f56c6c;
+  background-color: #2b1d1d;
+}
+
 .material-header {
   display: flex;
   justify-content: space-between;
@@ -945,5 +1140,12 @@ onMounted(async () => {
 
 .log-msg {
   color: #67c23a;
+}
+
+@media (max-width: 768px) {
+  .craft-count-col {
+    text-align: left !important;
+    margin-top: 10px;
+  }
 }
 </style>

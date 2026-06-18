@@ -1,6 +1,9 @@
 import map from "../common/mapping";
 import specialMap from "../common/specialMap";
-import { ElMessage } from "element-plus";
+const ElMessage = (msg) => console.log("[自動化訊息]", msg);
+ElMessage.success = (msg) => console.log("[自動化成功]", msg);
+ElMessage.warning = (msg) => console.warn("[自動化警告]", msg);
+ElMessage.error = (msg) => console.error("[自動化錯誤]", msg);
 import sleep from "./sleep";
 
 class autoBattleChecker {
@@ -27,6 +30,22 @@ class autoBattleChecker {
   }
 
   safeMove = async (mapId) => {
+    const pMode = this.setting?.partyMode;
+    const isMember = pMode && pMode.enabled && !pMode.isLeader;
+
+    // 如果是組隊中的隊員，且目前本機顯示在起始之鎮，而目標不是起始之鎮
+    // 隊長可能已帶隊移動，將隊員拉過去了，所以此時先嘗試確認落地一次
+    if (isMember && this.profile.zoneName === "起始之鎮" && mapId !== 0) {
+      console.log("[隊員落地檢查] 隊長可能已帶隊移動，嘗試直接確認落地...");
+      const arriveRes = await this.user.moveComplete();
+      if (arriveRes && !arriveRes.error && arriveRes.zoneName !== "起始之鎮") {
+        ElMessage("隊員跟隨：確認落地成功，抵達 " + arriveRes.zoneName);
+        this.setProfileInfo(arriveRes);
+        this.profile = arriveRes;
+        return arriveRes;
+      }
+    }
+
     let moveRes = await this.user.move(mapId);
 
     const isConflict =
@@ -171,25 +190,26 @@ class autoBattleChecker {
 
     // 1. 如果角色當前在「起始之鎮」
     if (this.profile.zoneName === "起始之鎮") {
-      const targetPercent = this.setting?.autoRest
-        ? Number(this.setting.autoRestPercent ?? 90)
-        : 100;
-      const hpPercent = (this.profile.hp / this.profile.fullHp) * 100;
-      const mpPercent = (this.profile.sp / this.profile.fullSp) * 100;
+      const autoRestEnabled = !!this.setting?.autoRest;
+      if (autoRestEnabled) {
+        const targetPercent = Number(this.setting.autoRestPercent ?? 90);
+        const hpPercent = (this.profile.hp / this.profile.fullHp) * 100;
+        const mpPercent = (this.profile.sp / this.profile.fullSp) * 100;
 
-      const isHpAboveThreshold = this.profile.hp > (this.setting.hp || 0);
-      const isSpAboveThreshold = this.profile.sp > (this.setting.sp || 0);
+        const isHpAboveThreshold = this.profile.hp > (this.setting.hp || 0);
+        const isSpAboveThreshold = this.profile.sp > (this.setting.sp || 0);
 
-      // 檢查是否需要休息（血量或魔量未達標，或低於保護門檻）
-      if (
-        hpPercent < targetPercent ||
-        mpPercent < targetPercent ||
-        !isHpAboveThreshold ||
-        !isSpAboveThreshold
-      ) {
-        ElMessage(`回城休息中，補滿狀態至門檻 (${targetPercent}%)...`);
-        await this.rest(); // 發起休息
-        return false; // 等待休息完成
+        // 檢查是否需要休息（血量或魔量未達標，或低於保護門檻）
+        if (
+          hpPercent < targetPercent ||
+          mpPercent < targetPercent ||
+          !isHpAboveThreshold ||
+          !isSpAboveThreshold
+        ) {
+          ElMessage(`回城休息中，補滿狀態至門檻 (${targetPercent}%)...`);
+          await this.rest(); // 發起休息
+          return false; // 等待休息完成
+        }
       }
     }
 
