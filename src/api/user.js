@@ -99,8 +99,25 @@ function user(inputToken) {
       activeStatuses[0] ||
       "空閒";
 
-    const currentZoneName =
-      towerStatus?.zones?.[towerStatus?.zone]?.name || "未知區域";
+    let currentZoneName = "未知區域";
+    if (towerStatus) {
+      const isMoving =
+        towerStatus.moveEndsAt ||
+        (towerStatus.destinationZone !== undefined &&
+          towerStatus.destinationZone !== null &&
+          towerStatus.zone !== towerStatus.destinationZone);
+      if (
+        isMoving &&
+        towerStatus.destinationZone !== undefined &&
+        towerStatus.destinationZone !== null
+      ) {
+        currentZoneName =
+          towerStatus.zones?.[towerStatus.destinationZone]?.name || "未知區域";
+      } else {
+        currentZoneName =
+          towerStatus.zones?.[towerStatus.zone]?.name || "未知區域";
+      }
+    }
 
     return {
       ...character,
