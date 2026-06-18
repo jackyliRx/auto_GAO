@@ -654,7 +654,7 @@ const getAvatarBgColor = (acc: any) => {
           >
             配置備份與還原
           </el-button>
-          <span class="version-text">v1.0.0-Modern</span>
+          <span class="version-text">v1.1.0-Modern</span>
         </template>
       </div>
     </el-aside>
@@ -810,7 +810,7 @@ const getAvatarBgColor = (acc: any) => {
           >
             配置備份與還原
           </el-button>
-          <span class="version-text">v1.0.0-Modern</span>
+          <span class="version-text">v1.1.0-Modern</span>
         </div>
       </div>
     </el-drawer>
