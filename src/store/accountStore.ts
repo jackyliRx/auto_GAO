@@ -1287,13 +1287,16 @@ async function startBattle(token: string) {
                           if (bossRes.profile?.towerStatus) {
                             acc.tower = bossRes.profile.towerStatus;
                           }
-                          let logMsg = `[挑戰BOSS成功] 結果: ${
-                            fightData.winner || "未知"
-                          }, 獲得經驗: ${fightData.exp || 0}, 金幣: ${
-                            fightData.gold || 0
-                          }`;
-                          if (fightData.advance) {
-                            if (fightData.advance.died) logMsg += ` [玩家死亡]`;
+                          const resultStr = fightData.bossWon
+                            ? "勝利"
+                            : fightData.bossDraw
+                            ? "平手"
+                            : "失敗";
+                          let logMsg = `[挑戰BOSS成功] 結果: ${resultStr}, 獲得經驗: ${
+                            fightData.expGained || 0
+                          }, 金幣: ${fightData.goldGained || 0}`;
+                          if (fightData.hp !== undefined && fightData.hp <= 0) {
+                            logMsg += ` [玩家死亡]`;
                           }
                           addLog(acc, "battle", logMsg);
                         }
