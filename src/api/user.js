@@ -34,9 +34,6 @@ function user(inputToken, username = "", password = "") {
         if (this.username && this.password) {
           originalRequest._retry = true;
           try {
-            console.log(
-              `[自動登入] 偵測到 401，嘗試為 ${this.username} 重新登入`
-            );
             const res = await globalAxios.post(`${baseurl}/auth/login`, {
               username: this.username,
               password: this.password,
@@ -45,7 +42,6 @@ function user(inputToken, username = "", password = "") {
               const oldToken = this.token;
               const newToken = res.data.token;
               this.token = newToken;
-              console.log(`[自動登入] 重新登入成功！新 Token 已套用`);
 
               if (this.onTokenRefresh) {
                 this.onTokenRefresh(oldToken, newToken);

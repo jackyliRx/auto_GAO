@@ -237,13 +237,7 @@ async function refreshAccountState(acc: Account, forceAll = false) {
 function addAccount(token: string, username = "", password = "") {
   // 將 username (優先) 或 token 作為此帳號在系統中的唯一識別 accountId
   const accountId = username || token;
-  console.log("[addAccount] 開始呼叫:", {
-    token: token.slice(0, 15) + "...",
-    username,
-    accountId,
-  });
   if (accounts.some((acc) => (acc.username || acc.token) === accountId)) {
-    console.warn(`[addAccount] 帳號 ${accountId} 已存在於列表中，略過新增`);
     return;
   }
 
@@ -274,31 +268,17 @@ function addAccount(token: string, username = "", password = "") {
   const userObj = new user(token, finalUsername, finalPassword);
 
   userObj.onTokenRefresh = (oldToken: string, newToken: string) => {
-    console.log("[onTokenRefresh] 事件觸發:", {
-      oldToken: oldToken.slice(0, 15) + "...",
-      newToken: newToken.slice(0, 15) + "...",
-    });
     const acc = accounts.find((a) => a.token === oldToken);
     if (acc) {
       const oldAccountId = acc.username || oldToken;
       const newAccountId = acc.username || newToken;
-      console.log(
-        "[onTokenRefresh] 尋找到對應帳號:",
-        acc.username || "無帳號名稱",
-        { oldAccountId, newAccountId }
-      );
 
       if (oldAccountId !== newAccountId) {
-        console.log("[onTokenRefresh] 準備遷移舊 Key 資料到新 Key:", {
-          oldAccountId,
-          newAccountId,
-        });
         // 1. 遷移 localStorage setting
         const oldSettings = localStorage.getItem(`setting_${oldAccountId}`);
         if (oldSettings) {
           localStorage.setItem(`setting_${newAccountId}`, oldSettings);
           localStorage.removeItem(`setting_${oldAccountId}`);
-          console.log("[onTokenRefresh] 已移轉 setting 設定");
         }
 
         // 2. 遷移 localStorage forge favorites
@@ -308,21 +288,13 @@ function addAccount(token: string, username = "", password = "") {
         if (oldFavorites) {
           localStorage.setItem(`forge_favorites_${newAccountId}`, oldFavorites);
           localStorage.removeItem(`forge_favorites_${oldAccountId}`);
-          console.log("[onTokenRefresh] 已移轉 forge favorites 收藏設定");
         }
-      } else {
-        console.log(
-          "[onTokenRefresh] accountId 沒有改變，不需執行 LocalStorage Key 移轉"
-        );
       }
 
       // 3. 更新 userObj 內部的 token
       acc.userObj.token = newToken;
       // 4. 更新 memory 中的 token 欄位。這會觸發 watch(accounts) 自動將新設定寫入 setting_${newAccountId} 且更新 strList 列表
       acc.token = newToken;
-      console.log(
-        "[onTokenRefresh] 已更新記憶體與 userObj 的 Token 值為新 Token"
-      );
 
       // 5. 立即重新整理帳號狀態以刷新 UI 暱稱等資料
       refreshAccountState(acc, true);
@@ -456,20 +428,9 @@ function addAccount(token: string, username = "", password = "") {
     },
   });
 
-  console.log(
-    "[addAccount] 準備推入 accounts 陣列, 當前 accounts 數量:",
-    accounts.length
-  );
   accounts.push(account);
-  console.log(
-    "[addAccount] 已推入 accounts, 目前數量:",
-    accounts.length,
-    "列表內容:",
-    accounts.map((a) => a.username || a.token)
-  );
   if (selectedAccountIndex.value === -1) {
     selectedAccountIndex.value = 0;
-    console.log("[addAccount] selectedAccountIndex 初始化為 0");
   }
 
   // 初始化讀取個人資料與 Token 身份驗證

@@ -38,10 +38,6 @@ const submitAddAccount = async () => {
     }
     isLoggingIn.value = true;
     try {
-      console.log(
-        "[submitAddAccount] 開始進行帳密驗證登入:",
-        loginForm.username
-      );
       const res = await axios.post(
         "https://gunart-backend.onrender.com/api/auth/login",
         {
@@ -50,24 +46,10 @@ const submitAddAccount = async () => {
         }
       );
       if (res.data && res.data.token) {
-        console.log(
-          "[submitAddAccount] 登入驗證成功，取得 Token。準備呼叫 store 的 addAccount。目前帳號數:",
-          accounts.length
-        );
         addAccount(res.data.token, loginForm.username, loginForm.password);
-        console.log(
-          "[submitAddAccount] addAccount 呼叫完畢。目前帳號數:",
-          accounts.length,
-          "帳號清單:",
-          accounts.map((a) => a.username || a.token)
-        );
 
         // 自動選中為當前帳號
         selectedAccountIndex.value = accounts.length - 1;
-        console.log(
-          "[submitAddAccount] 設定 selectedAccountIndex 為:",
-          selectedAccountIndex.value
-        );
 
         ElMessage.success("帳號登入成功並已新增");
         addAccountDialogVisible.value = false;
@@ -92,24 +74,10 @@ const submitAddAccount = async () => {
       ElMessage.warning("請輸入 Token");
       return;
     }
-    console.log(
-      "[submitAddAccount] 開始以 Token 直接新增。目前帳號數:",
-      accounts.length
-    );
     addAccount(tokenForm.token);
-    console.log(
-      "[submitAddAccount] addAccount (Token) 呼叫完畢。目前帳號數:",
-      accounts.length,
-      "帳號清單:",
-      accounts.map((a) => a.username || a.token)
-    );
 
     // 自動選中為當前帳號
     selectedAccountIndex.value = accounts.length - 1;
-    console.log(
-      "[submitAddAccount] 設定 selectedAccountIndex 為:",
-      selectedAccountIndex.value
-    );
 
     ElMessage.success("帳號已新增");
     addAccountDialogVisible.value = false;

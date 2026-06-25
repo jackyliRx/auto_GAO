@@ -507,10 +507,6 @@ const handleSaveCredentials = async (relogin = false) => {
       ElMessage.warning("請填寫帳號與密碼以進行重新登入");
       return;
     }
-    console.log(
-      "[handleSaveCredentials] 點選儲存並重新登入。帳號:",
-      credForm.username
-    );
     isRefreshingToken.value = true;
     try {
       const res = await axios.post(
@@ -521,19 +517,9 @@ const handleSaveCredentials = async (relogin = false) => {
         }
       );
       if (res.data && res.data.token) {
-        console.log(
-          "[handleSaveCredentials] 登入取得新 Token:",
-          res.data.token.slice(0, 15) + "..."
-        );
-        console.log(
-          "[handleSaveCredentials] 準備呼叫 userObj.onTokenRefresh..."
-        );
         selectedAccount.value.userObj.onTokenRefresh?.(
           selectedAccount.value.token,
           res.data.token
-        );
-        console.log(
-          "[handleSaveCredentials] onTokenRefresh 執行完成。目前 selectedAccount.token 已更新"
         );
         ElMessage.success("登入成功，已重新獲取 Token 並更新設定！");
         showCredentialsDialog.value = false;
@@ -552,10 +538,6 @@ const handleSaveCredentials = async (relogin = false) => {
       isRefreshingToken.value = false;
     }
   } else {
-    console.log(
-      "[handleSaveCredentials] 僅儲存帳密（不執行重登）:",
-      credForm.username
-    );
     ElMessage.success("帳密設定已儲存");
     showCredentialsDialog.value = false;
   }
