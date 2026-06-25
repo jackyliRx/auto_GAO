@@ -84,6 +84,7 @@ export interface Account {
       medicineCheckTag: boolean;
       selectedWeaponQueueMain: any[];
       selectedWeaponQueueOff: any[];
+      selectedArmorQueue: any[];
       medicineSetting: {
         medicineHpId: string;
         medicineSpId: string;
@@ -182,6 +183,7 @@ watch(
           acc.automation.battle.selectedWeaponQueueMain || [],
         selectedWeaponQueueOff:
           acc.automation.battle.selectedWeaponQueueOff || [],
+        selectedArmorQueue: acc.automation.battle.selectedArmorQueue || [],
         forgeWeaponPayload: acc.automation.forge.weaponPayload,
         forgeSetting: acc.automation.forge.setting,
         miningSetting: {
@@ -385,6 +387,7 @@ function addAccount(token: string, username = "", password = "") {
         medicineCheckTag: savedSetting.setting?.medicineCheckTag ?? false,
         selectedWeaponQueueMain: savedSetting.selectedWeaponQueueMain ?? [],
         selectedWeaponQueueOff: savedSetting.selectedWeaponQueueOff ?? [],
+        selectedArmorQueue: savedSetting.selectedArmorQueue ?? [],
         medicineSetting: {
           medicineHpId: savedSetting.medicineSetting?.medicineHpId ?? "",
           medicineSpId: savedSetting.medicineSetting?.medicineSpId ?? "",
@@ -654,17 +657,29 @@ async function startBattle(token: string) {
               )
             : [];
 
+        // 独立防具佇列
+        const selectArmorList =
+          acc.automation.battle.selectedArmorQueue.length > 0
+            ? acc.automation.battle.selectedArmorQueue
+            : weaponList.filter((w: any) =>
+                typeList.armor.includes(w.typeName)
+              );
+
         // 2. 初始化 weaponChecker
         const myWeaponChecker = new weaponChecker(
           acc.automation.battle.setting,
           weaponList,
           selectWeaponListMain,
           selectWeaponListOff,
+          selectArmorList,
           (newList: any) => {
             acc.automation.battle.selectedWeaponQueueMain = newList;
           },
           (newList: any) => {
             acc.automation.battle.selectedWeaponQueueOff = newList;
+          },
+          (newList: any) => {
+            acc.automation.battle.selectedArmorQueue = newList;
           },
           acc.automation.battle.weaponCheckTag,
           acc.automation.battle.armorCheckTag,

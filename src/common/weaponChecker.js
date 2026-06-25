@@ -7,8 +7,10 @@ class weaponChecker {
     weaponList,
     selectWeaponListMain,
     selectWeaponListOff,
+    selectArmorList,
     selectWeaponsMain,
     selectWeaponsOff,
+    selectArmors,
     checkWeaponTag,
     checkArmorTag,
     user
@@ -17,13 +19,16 @@ class weaponChecker {
     this.weaponList = weaponList;
     this.selectWeaponListMain = selectWeaponListMain;
     this.selectWeaponListOff = selectWeaponListOff;
+    this.selectArmorList = selectArmorList;
     this.selectWeaponsMain = selectWeaponsMain;
     this.selectWeaponsOff = selectWeaponsOff;
+    this.selectArmors = selectArmors;
     this.checkWeaponTag = checkWeaponTag;
     this.checkArmorTag = checkArmorTag;
     this.user = user;
     this.equipmentCanBeSelectMain = [];
     this.equipmentCanBeSelectOff = [];
+    this.equipmentCanBeSelectArmor = [];
     this.sortedEquipmentCanBeSelectMain = {};
     this.sortedEquipmentCanBeSelectOff = {};
   }
@@ -32,16 +37,27 @@ class weaponChecker {
     try {
       let equipped = await this.getEquippedWeapon();
 
-      // 把裝備中的裝備從待選清單去除
+      // 武器候選池：主手（武器類）
       this.equipmentCanBeSelectMain = this.getEquipmentCanBeSelect(
         equipped,
-        this.selectWeaponListMain,
+        this.selectWeaponListMain.filter((w) =>
+          typeList.weapon.includes(w.typeName)
+        ),
         this.selectWeaponsMain
       );
+
+      // 武器候選池：副手（武器類）
       this.equipmentCanBeSelectOff = this.getEquipmentCanBeSelect(
         equipped,
         this.selectWeaponListOff,
         this.selectWeaponsOff
+      );
+
+      // 防具候選池：使用獨立防具佇列
+      this.equipmentCanBeSelectArmor = this.getEquipmentCanBeSelect(
+        equipped,
+        this.selectArmorList,
+        this.selectArmors
       );
 
       // 分類裝備為武器防具
@@ -52,6 +68,9 @@ class weaponChecker {
       this.sortedEquipmentCanBeSelectOff = await this.sortWeaponsAndArmors(
         this.equipmentCanBeSelectOff
       );
+      // 防具候選直接用 armor 陣列
+      this.sortedEquipmentCanBeSelectMain.armor =
+        this.equipmentCanBeSelectArmor;
 
       if (this.checkWeaponTag) {
         if (!(await this.checkWeapon(sortedEquipment.weapon))) return false;
@@ -62,11 +81,7 @@ class weaponChecker {
       }
 
       // 把剩餘可選的武器寫回各自的 store 佇列中
-      this.selectWeaponsMain(
-        this.sortedEquipmentCanBeSelectMain.weapon.concat(
-          this.sortedEquipmentCanBeSelectMain.armor
-        )
-      );
+      this.selectWeaponsMain(this.sortedEquipmentCanBeSelectMain.weapon);
       this.selectWeaponsOff(this.sortedEquipmentCanBeSelectOff.weapon);
 
       return true;

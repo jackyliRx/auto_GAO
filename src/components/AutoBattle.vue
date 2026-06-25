@@ -564,15 +564,18 @@
         :weapon-list="weaponList"
         :selected-weapon-queue-main="selectWeaponListMain"
         :selected-weapon-queue-off="selectWeaponListOff"
+        :selected-armor-queue="selectArmorList"
         :weapon-check-tag="weaponCheckTag"
         :armor-check-tag="armorCheckTag"
         :equipment-check-tag="equipmentCheckTag"
         :enable-dual-wield="setting.enableDualWield"
         @equipment-check="equipmentCheck"
-        @update-check-weapon="checkWeapon"
-        @update-check-armor="checkArmor"
+        @update-check-weapon="handleUpdateCheckWeapon"
+        @update-check-armor="handleUpdateCheckArmor"
+        @equipment-check-off="handleUpdateDualWield"
         @update:selected-weapon-queue-main="updateSelectedWeaponQueueMain"
         @update:selected-weapon-queue-off="updateSelectedWeaponQueueOff"
+        @update:selected-armor-queue="updateSelectedArmorQueue"
       />
     </div>
   </div>
@@ -627,6 +630,7 @@ const items = computed(() => ({
 }));
 const selectWeaponListMain = ref<any[]>([]);
 const selectWeaponListOff = ref<any[]>([]);
+const selectArmorList = ref<any[]>([]);
 
 const setting = ref({
   hp: 100,
@@ -711,6 +715,7 @@ watch(
         newVal.setting.useTeleportCrystal ?? false;
       selectWeaponListMain.value = newVal.selectedWeaponQueueMain || [];
       selectWeaponListOff.value = newVal.selectedWeaponQueueOff || [];
+      selectArmorList.value = newVal.selectedArmorQueue || [];
       setting.value.partyMode = {
         enabled: newVal.setting.partyMode?.enabled ?? false,
         isLeader: newVal.setting.partyMode?.isLeader ?? false,
@@ -878,14 +883,30 @@ const updateSelectedWeaponQueueOff = (weapons: any[]) => {
   }
 };
 
+const updateSelectedArmorQueue = (armors: any[]) => {
+  selectArmorList.value = armors;
+  if (account.value) {
+    account.value.automation.battle.selectedArmorQueue = [...armors];
+  }
+};
+
 const equipmentCheck = () => {
   equipmentCheckTag.value = !equipmentCheckTag.value;
 };
-const checkWeapon = () => {
-  weaponCheckTag.value = !weaponCheckTag.value;
+
+// 主手勾選連動 weaponCheckTag
+const handleUpdateCheckWeapon = (val: boolean) => {
+  weaponCheckTag.value = val;
 };
-const checkArmor = () => {
-  armorCheckTag.value = !armorCheckTag.value;
+
+// 防具勾選連動 armorCheckTag
+const handleUpdateCheckArmor = (val: boolean) => {
+  armorCheckTag.value = val;
+};
+
+// 副手勾選連動 enableDualWield
+const handleUpdateDualWield = (val: boolean) => {
+  setting.value.enableDualWield = val;
 };
 
 const showContent = ref(false);
