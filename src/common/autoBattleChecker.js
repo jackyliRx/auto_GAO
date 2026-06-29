@@ -1,8 +1,9 @@
+/* eslint-disable @typescript-eslint/no-empty-function, @typescript-eslint/no-unused-vars */
 import map, { secretRealmConfig } from "../common/mapping";
-const ElMessage = (msg) => console.log("[自動化訊息]", msg);
-ElMessage.success = (msg) => console.log("[自動化成功]", msg);
-ElMessage.warning = (msg) => console.warn("[自動化警告]", msg);
-ElMessage.error = (msg) => console.error("[自動化錯誤]", msg);
+const ElMessage = (msg) => {};
+ElMessage.success = (msg) => {};
+ElMessage.warning = (msg) => {};
+ElMessage.error = (msg) => {};
 import sleep from "./sleep";
 
 class autoBattleChecker {
@@ -127,7 +128,6 @@ class autoBattleChecker {
 
   checkSetting = async () => {
     try {
-      console.log("checkSetting");
       if (this.profile.hp <= 0) {
         if (this.profile.zoneName === "起始之鎮") {
           ElMessage("偵測到死亡回城，等待 3 秒後直接出發前往目標地圖...");
