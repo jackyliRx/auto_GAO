@@ -387,6 +387,9 @@
               <el-tab-pane name="mine" label="自動採礦">
                 <AutoMine :userObj="selectedAccount.userObj" />
               </el-tab-pane>
+              <el-tab-pane name="market" label="自動市場">
+                <AutoMarket :userObj="selectedAccount.userObj" />
+              </el-tab-pane>
             </el-tabs>
           </div>
         </div>
@@ -467,6 +470,7 @@ import AutoBattle from "../components/AutoBattle.vue";
 import AutoForge from "../components/AutoForge.vue";
 import AutoRecycle from "../components/AutoRecycle.vue";
 import AutoMine from "../components/AutoMine.vue";
+import AutoMarket from "../components/AutoMarket.vue";
 import moment from "moment";
 
 const store = useAccountStore();
@@ -651,7 +655,6 @@ const getWaitingBossStatus = (acc: any) => {
     圓明園: 5,
     yuanmingyuan: 5,
     黃石國家公園: 6,
-    yellowstone: 6,
   };
 
   const zoneName = acc.profile.zoneName;

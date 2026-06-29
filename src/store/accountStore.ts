@@ -122,6 +122,18 @@ export interface Account {
       lastBoughtAt: string;
       lastBoughtSessionId: number;
     };
+    market: {
+      running: boolean;
+      loopId?: number;
+      logs: LogItem[];
+      setting: {
+        sellerName: string;
+        priceLimit: number;
+        interval: number;
+        maxPurchaseQty: number;
+        enableSplitPurchase: boolean;
+      };
+    };
   };
   lotteryProgressState?: string;
   party: any;
@@ -188,6 +200,14 @@ watch(
           duration: acc.automation.mining.setting?.duration ?? 15,
         },
         lottery: acc.automation.lottery,
+        marketSetting: {
+          sellerName: acc.automation.market.setting?.sellerName ?? "",
+          priceLimit: acc.automation.market.setting?.priceLimit ?? 0,
+          interval: acc.automation.market.setting?.interval ?? 5,
+          maxPurchaseQty: acc.automation.market.setting?.maxPurchaseQty ?? 0,
+          enableSplitPurchase:
+            acc.automation.market.setting?.enableSplitPurchase ?? false,
+        },
         username: acc.username || "",
         password: acc.password || "",
       };
@@ -425,6 +445,18 @@ function addAccount(token: string, username = "", password = "") {
         lastBoughtAt: savedSetting.lottery?.lastBoughtAt ?? "",
         lastBoughtSessionId: savedSetting.lottery?.lastBoughtSessionId ?? 0,
       },
+      market: {
+        running: false,
+        logs: [],
+        setting: {
+          sellerName: savedSetting.marketSetting?.sellerName ?? "",
+          priceLimit: savedSetting.marketSetting?.priceLimit ?? 0,
+          interval: savedSetting.marketSetting?.interval ?? 5,
+          maxPurchaseQty: savedSetting.marketSetting?.maxPurchaseQty ?? 0,
+          enableSplitPurchase:
+            savedSetting.marketSetting?.enableSplitPurchase ?? false,
+        },
+      },
     },
   });
 
@@ -470,7 +502,7 @@ import sleep from "../common/sleep";
 
 function addLog(
   acc: Account,
-  type: "battle" | "forge" | "lumbering" | "mining",
+  type: "battle" | "forge" | "lumbering" | "mining" | "market",
   message: string
 ) {
   const time = new Date().toLocaleTimeString();
@@ -1972,6 +2004,186 @@ async function oneClickLotteryAll() {
   return { successCount, failCount };
 }
 
+function splitQuantity(total: number): number[] {
+  if (total <= 3) return [total];
+  const chunks: number[] = [];
+  let remaining = total;
+  while (remaining > 0) {
+    if (remaining <= 3) {
+      chunks.push(remaining);
+      break;
+    }
+    const maxChunk = Math.min(8, remaining - 1);
+    const chunk = Math.floor(Math.random() * (maxChunk - 2 + 1)) + 2;
+    chunks.push(chunk);
+    remaining -= chunk;
+  }
+  return chunks;
+}
+
+async function startMarket(token: string) {
+  const acc = accounts.find((a) => a.token === token);
+  if (!acc || acc.automation.market.running) return;
+
+  acc.automation.market.running = true;
+  const currentLoopId = Date.now();
+  acc.automation.market.loopId = currentLoopId;
+  addLog(acc, "market", "自動市場購買已啟動");
+
+  (async () => {
+    while (
+      acc.automation.market.running &&
+      acc.automation.market.loopId === currentLoopId
+    ) {
+      try {
+        if (acc.automation.market.loopId !== currentLoopId) break;
+
+        const sellerName =
+          acc.automation.market.setting.sellerName?.trim() || "";
+        const priceLimit =
+          Number(acc.automation.market.setting.priceLimit) || 0;
+        const maxPurchaseQty =
+          Number(acc.automation.market.setting.maxPurchaseQty) || 0;
+        const enableSplit =
+          acc.automation.market.setting.enableSplitPurchase === true;
+
+        addLog(acc, "market", "正在獲取市場交易列表...");
+        const res = await acc.userObj.getMarketListings();
+
+        if (res && !res.error && Array.isArray(res.listings)) {
+          const myNickname = acc.profile.nickname || "";
+
+          const matchedListings = res.listings.filter((item: any) => {
+            if (item.status !== "active") return false;
+
+            // 避開自己上架的
+            if (myNickname && item.seller_name === myNickname) return false;
+
+            // 賣家過濾 (精確匹配，去空白)
+            if (sellerName && item.seller_name !== sellerName) return false;
+
+            // 價格過濾
+            if (priceLimit > 0 && item.price > priceLimit) return false;
+
+            return true;
+          });
+
+          if (matchedListings.length > 0) {
+            addLog(
+              acc,
+              "market",
+              `找到符合條件的商品共 ${matchedListings.length} 項，開始搶購...`
+            );
+
+            for (const item of matchedListings) {
+              if (
+                acc.automation.market.loopId !== currentLoopId ||
+                !acc.automation.market.running
+              )
+                break;
+
+              // 計算本次預計購買的總數
+              let buyQty = item.quantity;
+              if (maxPurchaseQty > 0) {
+                buyQty = Math.min(item.quantity, maxPurchaseQty);
+              }
+
+              if (buyQty <= 0) continue;
+
+              addLog(
+                acc,
+                "market",
+                `準備購買: ${item.item_name} (數量: ${buyQty}/${item.quantity}, 單價: ${item.price}, 賣家: ${item.seller_name})`
+              );
+
+              // 判斷是否拆單
+              const buyBatches =
+                enableSplit && buyQty > 3 ? splitQuantity(buyQty) : [buyQty];
+
+              for (let i = 0; i < buyBatches.length; i++) {
+                if (
+                  acc.automation.market.loopId !== currentLoopId ||
+                  !acc.automation.market.running
+                )
+                  break;
+
+                const currentBatchQty = buyBatches[i];
+                if (buyBatches.length > 1) {
+                  addLog(
+                    acc,
+                    "market",
+                    `[拆單購置] 正在發送子訂單 ${i + 1}/${
+                      buyBatches.length
+                    }，數量: ${currentBatchQty}...`
+                  );
+                }
+
+                const buyRes = await acc.userObj.buyMarketItem(
+                  item.id,
+                  currentBatchQty
+                );
+                if (buyRes && !buyRes.error) {
+                  addLog(
+                    acc,
+                    "market",
+                    `成功購買 ${item.item_name} x${currentBatchQty}，共支付 ${buyRes.total} 金幣，剩餘金幣: ${buyRes.newGold}`
+                  );
+                  if (buyRes.newGold !== undefined) {
+                    acc.profile.gold = buyRes.newGold;
+                  }
+                } else {
+                  addLog(
+                    acc,
+                    "market",
+                    `購買失敗: ${buyRes?.message || "未知錯誤"}`
+                  );
+                  // 如果失敗（比如商品已售罄或金幣不足），直接中斷這品項的其餘拆單
+                  break;
+                }
+
+                // 子訂單之間的隨機延遲 (800ms ~ 1500ms)
+                if (i < buyBatches.length - 1) {
+                  const subDelay =
+                    Math.floor(Math.random() * (1500 - 800 + 1)) + 800;
+                  await sleep(subDelay);
+                }
+              }
+
+              // 兩個大品項之間的延遲
+              await sleep(1500);
+            }
+          } else {
+            addLog(acc, "market", "未找到符合篩選條件的商品。");
+          }
+        } else {
+          addLog(
+            acc,
+            "market",
+            `獲取市場列表失敗: ${res?.message || "未知錯誤"}`
+          );
+        }
+      } catch (err: any) {
+        addLog(acc, "market", `運行出錯: ${err.message || err}`);
+      }
+
+      // 頻率控制 (最少 5 秒)
+      const intervalSec = Math.max(
+        5,
+        Number(acc.automation.market.setting.interval) || 5
+      );
+      await sleep(intervalSec * 1000);
+    }
+  })();
+}
+
+function stopMarket(token: string) {
+  const acc = accounts.find((a) => a.token === token);
+  if (!acc) return;
+  acc.automation.market.running = false;
+  acc.automation.market.loopId = undefined;
+  addLog(acc, "market", "自動市場購買已停止");
+}
+
 export const useAccountStore = () => ({
   accounts,
   selectedAccountIndex,
@@ -1986,6 +2198,8 @@ export const useAccountStore = () => ({
   stopForge,
   startMining,
   stopMining,
+  startMarket,
+  stopMarket,
   refreshAccount,
   refreshAccountState,
   oneClickLotteryAll,

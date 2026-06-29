@@ -933,6 +933,38 @@ function user(inputToken, username = "", password = "") {
       };
     }
   };
+
+  this.getMarketListings = async function () {
+    try {
+      const res = await api.get(`${baseurl}/market/listings`, {
+        headers: getHeaders(),
+      });
+      return res.data;
+    } catch (error) {
+      console.error("getMarketListings error:", error);
+      return {
+        error: true,
+        message: error.response?.data?.message || error.message,
+      };
+    }
+  };
+
+  this.buyMarketItem = async function (listingId, quantity = 1) {
+    try {
+      const res = await api.post(
+        `${baseurl}/market/buy/${listingId}`,
+        { quantity },
+        { headers: getHeaders() }
+      );
+      return res.data;
+    } catch (error) {
+      console.error("buyMarketItem error:", error);
+      return {
+        error: true,
+        message: error.response?.data?.message || error.message,
+      };
+    }
+  };
 }
 
 export default user;

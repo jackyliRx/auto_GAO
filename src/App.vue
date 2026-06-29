@@ -306,7 +306,7 @@ const isAtSecretRealmFloor = (acc: any) => {
   if (zoneName === "蘑菇園" || zoneName === "mushroom_garden") {
     return huntStage === secretRealmConfig[4001].enterFloor;
   }
-  if (zoneName === "黃石國家公園" || zoneName === "yellowstone") {
+  if (zoneName === "黃石國家公園") {
     return huntStage === secretRealmConfig[6001].enterFloor;
   }
   return false;
@@ -391,7 +391,6 @@ const getWaitingBossStatus = (acc: any) => {
     圓明園: 5,
     yuanmingyuan: 5,
     黃石國家公園: 6,
-    yellowstone: 6,
   };
 
   const zoneName = acc.profile.zoneName;
